@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #==============================================================================
-# module : anritsu_signal_generator.py
-# author : Pierre Heidmann
+# module : tinybilt.py
+# author : Holger Graef and others
 # license : MIT license
 #==============================================================================
 """
@@ -28,16 +28,14 @@ import numpy as np
 
 
 class TinyBiltChannel(BaseInstrument):
-
-    def __init__(self, TB, channel_num, caching_allowed=True,
+    def __init__(self, TB, channelid, caching_allowed=True,
                  caching_permissions={}):
         super(TinyBiltChannel, self).__init__(None, caching_allowed,
                                               caching_permissions)
         self._TB = TB
-        self._channel = channel_num
+        self._channel = channelid
 
     def reopen_connection(self):
-
         self._TB.reopen_connection()
 
     @contextmanager
@@ -55,6 +53,14 @@ class TinyBiltChannel(BaseInstrument):
             yield
         finally:
             self._TB.lock.release()
+
+
+
+class BiltVSource(TinyBiltChannel):     # Bilt voltage source
+#    def __init__(self, TB, channelid, caching_allowed=True,
+#                 caching_permissions={}):
+#        super(TinyBiltChannel, self).__init__(TB, channelid, caching_allowed,
+#                                              caching_permissions)
 
     @instrument_property
     @secure_communication()
@@ -224,6 +230,11 @@ class TinyBiltChannel(BaseInstrument):
             result = round(self._TB.ask_for_values('i{};Volt?'
                                                    .format(self._channel))[0],
                            5)
+            # wait for instrument to arrive at destination voltage
+            status = self._TB.ask_for_values('i{};volt:status?'.format(self._channel))[0]
+            while status != 1.0:        # TODO: timeout check here
+                time.sleep(0.05) # wait 50 ms for next check
+                status = self._TB.ask_for_values('i{};volt:status?'.format(self._channel))[0]
             if abs(result - value) > 1e-12:
                 raise InstrIOError(cleandoc('''Instrument did not set
                                             correctly the output
@@ -236,20 +247,25 @@ class TinyBiltChannel(BaseInstrument):
             with time of time_step between each step
         """
         with self.secure():
-            present_voltage = round(self._TB.ask_for_values
-                                   ('i{};Volt?'.format(self._channel))[0],
-                                    5)
+            present_voltage = round(self.voltage, 5)
             while abs(round(present_voltage - volt_destination,
                             5)) >= volt_step:
                 time.sleep(time_step)
-                self._TB.write('i{};volt {}'
-                               .format(self._channel, present_voltage))
-                present_voltage = round(present_voltage + volt_step
-                                        * np.sign(volt_destination
-                                                  - present_voltage), 5)
-            self._TB.write('i{};volt {}'
-                           .format(self._channel, volt_destination))
+                self.voltage = present_voltage+volt_step*np.sign(volt_destination-present_voltage)
 
+            self.voltage = volt_destination
+
+class BiltMCVMeter(TinyBiltChannel):    # Bilt multichannel voltmeter
+    @secure_communication()
+    def read_voltage_dc(self):
+        instrNum, chanNum = str.split(self._channel, ':')
+        voltage = self._TB.ask_for_values("I{};C{};MEAS?".format(instrNum, chanNum))
+        if not voltage:
+            raise InstrIOError(cleandoc('''Could not get voltage measurement from
+            TinyBilt'''))
+        else:
+            return voltage
+            
 
 class TinyBilt(VisaInstrument):
     """
@@ -269,17 +285,24 @@ class TinyBilt(VisaInstrument):
         para['term_chars'] = '\n'
         super(TinyBilt, self).open_connection(**para)
 
-    def get_channel(self, num):
+    @secure_communication()
+    def get_channel(self, channelid):
         """
         """
-        if num not in self.defined_channels:
+        if channelid not in self.defined_channels:
             return None
 
-        if num in self.channels:
-            return self.channels[num]
+        if channelid in self.channels:
+            return self.channels[channelid]
         else:
-            channel = TinyBiltChannel(self, num)
-            self.channels[num] = channel
+            instrType = self.get_instrument_type(channelid)
+            if instrType == 2101:      # single channel voltage source
+                channel = BiltVSource(self, channelid)
+            elif instrType == 4082:      # multichannel voltmeter 
+                channel = BiltMCVMeter(self, channelid)
+            else:
+                raise InstrIOError(cleandoc('''Unsupported instrument type: {}'''.format(instrType)))
+            self.channels[channelid] = channel
             return channel
 
     @instrument_property
@@ -287,13 +310,31 @@ class TinyBilt(VisaInstrument):
     def defined_channels(self):
         """
         """
-        channels = self.ask_for_values('I:L?')
+        channels = self.ask_for_values('I:L?') # return channel, id, channel, id, ...
         if channels:
-            defined_channels = channels[::2]
-
+            defined_channels = []
+            for c in range(len(channels)/2):
+                if channels[c*2+1] == 4082:          # identifies four-channel voltmeter
+                    for i in range(4):
+                        defined_channels.append('{}:{}'.format(int(channels[c*2]), i+1))
+                else:
+                    defined_channels.append('{}'.format(int(channels[c*2])))
+            
             return defined_channels
         else:
             raise InstrIOError(cleandoc('''Instrument did not return
                                             the defined channels'''))
+    
+    @secure_communication()
+    def get_instrument_type(self, channelid):
+        instrnum = int(str.split(channelid, ':')[0])
+        if channelid not in self.defined_channels:
+            return None
+        instrID = int(self.ask_for_values('I{};*idn?'.format(instrnum))[0])
+        if not instrID:
+            raise InstrIOError(cleandoc('''Instrument did not return channel ID'''))
+        else:
+            return instrID
+
 
 DRIVERS = {'TinyBilt': TinyBilt}

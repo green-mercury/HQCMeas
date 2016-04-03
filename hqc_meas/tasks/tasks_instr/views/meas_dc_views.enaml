@@ -23,7 +23,6 @@ enamldef DCVoltMeasView(BaseInstrumentView): view:
         text = 'Driver'
     ObjectCombo:
         items << sorted(task.driver_list)
-        items << sorted(drivers)
         selected := task.selected_driver
 
     Label:
@@ -40,18 +39,3 @@ enamldef DCVoltMeasView(BaseInstrumentView): view:
                      voltmeter'''), 60)
 
 TASK_VIEW_MAPPING = {'MeasDCVoltageTask' : DCVoltMeasView}
-
-enamldef MultiChannelVoltMeterILabel(Label):
-
-    attr interface
-    attr index = 4
-    text = 'Channel'
-
-enamldef MultiChannelVoltMeterIChannel(Field):
-
-    attr interface
-    text := interface.channel
-
-INTERFACE_VIEW_MAPPING = {'MultiChannelVoltMeterInterface':
-                          [MultiChannelVoltMeterILabel,
-                           MultiChannelVoltMeterIChannel]}

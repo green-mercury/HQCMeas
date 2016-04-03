@@ -6,7 +6,7 @@
 # =============================================================================
 """
 """
-from atom.api import (Float, Value, Str, set_default)
+from atom.api import (Float, Value, Str, Int, set_default)
 
 import time
 import logging
@@ -41,7 +41,7 @@ class SetDCVoltageTask(InterfaceableTaskMixin, InstrumentTask):
 
     driver_list = ['YokogawaGS200', 'Yokogawa7651']
 
-    def check(self, *args, **kwargs):        
+    def check(self, *args, **kwargs):
         """
         """
         test, traceback = super(SetDCVoltageTask, self).check(*args, **kwargs)
@@ -144,7 +144,7 @@ class MultiChannelVoltageSourceInterface(InstrTaskInterface):
     driver_list = ['TinyBilt']
 
     #: Id of the channel to use.
-    channel = Str("1").tag(pref=True)
+    channel = Int(1).tag(pref=True)
 
     #: Reference to the driver for the channel.
     channel_driver = Value()
@@ -180,7 +180,6 @@ class MultiChannelVoltageSourceInterface(InstrTaskInterface):
             run_time = task.root_task.run_time
             traceback = {}
             config = None
-            
 
             if task.selected_profile:
                 if 'profiles' in run_time:

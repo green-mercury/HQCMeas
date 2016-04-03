@@ -226,16 +226,23 @@ class BiltVSource(TinyBiltChannel):     # Bilt voltage source
 
         """
         with self.secure():
+            # check if correct voltage is already set
+            result = round(self._TB.ask_for_values('i{};Volt?'.format(self._channel))[0], 5)
+            if abs(result-value) < 1e-12:
+                return
+                
+            # set new voltage otherwise
             self._TB.write('i{};Volt {}'.format(self._channel, value))
-            result = round(self._TB.ask_for_values('i{};Volt?'
-                                                   .format(self._channel))[0],
-                           5)
+            
             # wait for instrument to arrive at destination voltage
             status = self._TB.ask_for_values('i{};volt:status?'.format(self._channel))[0]
             while status != 1.0:        # TODO: timeout check here
                 time.sleep(0.05) # wait 50 ms for next check
                 status = self._TB.ask_for_values('i{};volt:status?'.format(self._channel))[0]
-            if abs(result - value) > 1e-12:
+            
+            # check if correct voltage is set
+            result = round(self._TB.ask_for_values('i{};Volt?'.format(self._channel))[0], 5)
+            if abs(result-value) > 1e-12:
                 raise InstrIOError(cleandoc('''Instrument did not set
                                             correctly the output
                                             value'''))
@@ -259,12 +266,34 @@ class BiltMCVMeter(TinyBiltChannel):    # Bilt multichannel voltmeter
     @secure_communication()
     def read_voltage_dc(self):
         instrNum, chanNum = str.split(self._channel, ':')
-        voltage = self._TB.ask_for_values("I{};C{};MEAS?".format(instrNum, chanNum))
+        voltage = self._TB.ask_for_values("I{};C{};MEAS?".format(instrNum, chanNum))[0]
         if not voltage:
             raise InstrIOError(cleandoc('''Could not get voltage measurement from
             TinyBilt'''))
         else:
             return voltage
+    
+    @instrument_property
+    @secure_communication()
+    def vrange(self):
+        """getter method for voltage range
+        """
+        with self.secure():
+            instrNum, chanNum = str.split(self._channel, ':')
+            result = self._TB.ask_for_values("I{};C{};MEAS:RANG?".format(instrNum, chanNum))
+            if result is not None:
+                return result
+            else:
+                raise InstrIOError
+
+    @vrange.setter
+    @secure_communication()
+    def vrange(self, value):
+        """setter method for voltage raneg
+        """
+        with self.secure():
+            instrNum, chanNum = str.split(self._channel, ':')
+            self._TB.write('I{};C{};MEAS:RANG {}'.format(instrNum, chanNum, value))
             
 
 class TinyBilt(VisaInstrument):

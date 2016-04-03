@@ -6,13 +6,13 @@
 # =============================================================================
 """
 """
-from atom.api import Float, set_default
+from atom.api import Float, set_default, Str, Value
 from time import sleep
 
-from hqc_meas.tasks.api import InstrumentTask
+from hqc_meas.tasks.api import InstrumentTask, InstrTaskInterface, InterfaceableTaskMixin
 
 
-class MeasDCVoltageTask(InstrumentTask):
+class MeasDCVoltageTask(InterfaceableTaskMixin, InstrumentTask):
     """Measure a dc voltage.
 
     Wait for any parallel operation before execution and then wait the
@@ -27,7 +27,7 @@ class MeasDCVoltageTask(InstrumentTask):
 
     wait = set_default({'activated': True, 'wait': ['instr']})
 
-    def perform(self):
+    def i_perform(self):
         """
         """
         if not self.driver:
@@ -39,3 +39,33 @@ class MeasDCVoltageTask(InstrumentTask):
         self.write_in_database('voltage', value)
 
 KNOWN_PY_TASKS = [MeasDCVoltageTask]
+
+class MultiChannelVoltMeterInterface(InstrTaskInterface):
+    """
+    """
+    has_view = True
+
+    driver_list = ['TinyBilt']
+
+    #: Id of the channel to use.
+    channel = Str("1").tag(pref=True)
+
+    #: Reference to the driver for the channel.
+    channel_driver = Value()
+
+    def perform(self, value=None):
+        """
+        """
+        task = self.task
+        if not task.driver:
+            task.start_driver()
+
+        if not self.channel_driver:
+            self.channel_driver = task.driver.get_channel(self.channel)
+
+        sleep(task.wait_time)
+        
+        value = self.channel_driver.read_voltage_dc()
+        task.write_in_database('voltage', value)
+
+INTERFACES = {'MeasDCVoltageTask': [MultiChannelVoltMeterInterface]}

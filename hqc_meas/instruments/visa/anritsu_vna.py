@@ -6,33 +6,23 @@
 #==============================================================================
 """
 
-This module defines drivers for TinyBilt using VISA library.
+This module defines drivers for Anritsu Vector Star MS4644B using VISA library.
 
 :Contains:
-    TinyBiltChannel
-    TinyBilt
+    AnritsuVNA
 
 
 """
-from threading import Lock
-from contextlib import contextmanager
-from ..driver_tools import (BaseInstrument, InstrIOError, secure_communication,
-                            instrument_property)
+from ..driver_tools import secure_communication
 from ..visa_tools import VisaInstrument
-from visa import VisaTypeError
-from textwrap import fill
-from inspect import cleandoc
-import re
-import time
-import numpy as np
 import visa
 import struct
 
 class AnritsuVNA(VisaInstrument):
     """
     """
-    _channel = 1    
-        
+    _channel = 1   
+
     def open_connection(self, **para):
         """Open the connection to the instr using the `connection_str`
         """
@@ -46,6 +36,7 @@ class AnritsuVNA(VisaInstrument):
         # Check that everything works fine for the moment.
         #print self.ask('SYST:ERR?')
 
+    @secure_communication()
     def ask_values_anritsu(self, query_str):
         '''
         This function sends a query to the VNA and retrieves the returned values
@@ -76,21 +67,25 @@ class AnritsuVNA(VisaInstrument):
         self.write(':FORM:DATA ASC;')        # read data in ASCII format
         return struct.unpack('!'+'d'*(count/8), data) # convert data from big-endian binary doubles to array of python doubles
 
+    @secure_communication()
     def get_freq_list(self):
         return self.ask_values_anritsu(':SENS1:FREQ:DATA?;')
-        
+    
+    @secure_communication()
     def get_trace(self, trace_num):
         '''
         Gets trace number trace_num from VNA.
         '''
         # select desired trace
-        self.write(':CALC1:PAR{}:SEL;'.format(trace_num)) 
+        self.write(':CALC1:PAR{}:SEL;'.format(trace_num))
+        assert int(self.ask(':CALC1:PAR:SEL?')) == int(trace_num)
         data = self.ask_values_anritsu(':CALC1:DATA:SDAT?')
         
         sreal = data[::2]
         simag = data[1::2]
         return sreal, simag
-        
+     
+    @secure_communication()
     def single_sweep(self):
         '''
         This function starts a single sweep (VNA will hold at the end of the
@@ -113,20 +108,26 @@ class AnritsuVNA(VisaInstrument):
         
         print 'Sweep is done'
         
+    @secure_communication()        
     def enable_averaging(self):
         self.write(':SENS1:AVER ON;')
     
+    @secure_communication()
     def disable_averaging(self):
         self.write(':SENS1:AVER OFF;')
         
+    @secure_communication()        
     def set_average_count(self, count):
         self.write(':SENS1:AVER:COUNT {}'.format(count))
         
     AVG_POINT_BY_POINT = 'POIN'
     AVG_SWEEP_BY_SWEEP = 'SWE'
+    
+    @secure_communication()
     def set_average_type(self, typ):
         self.write(':SENS1:AVER:TYP {}'.format(typ))
     
+    @secure_communication()
     def set_average(self, count, typ):
         self.enable_averaging()
         self.set_average_count(count)

@@ -1,0 +1,23 @@
+# -*- coding: utf-8 -*-
+# =============================================================================
+# module : sleep_task_view.enaml
+# author : Matthieu Dartiailh
+# license : MIT license
+# =============================================================================
+"""
+"""
+from enaml.layout.api import hbox, align
+from enaml.widgets.api import (GroupBox, Label)
+from enaml.stdlib.fields import FloatField
+
+
+enamldef TimeView(GroupBox):
+
+    attr task
+    title << task.task_name
+    padding = (0,0,5,5)
+
+    Label: lab:
+        text = 'Timestamp'
+
+TASK_VIEW_MAPPING = {'TimeTask': TimeView}

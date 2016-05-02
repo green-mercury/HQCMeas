@@ -234,6 +234,7 @@ class BiltVSource(TinyBiltChannel):     # Bilt voltage source
             # set new voltage otherwise
             self._TB.write('i{};Volt {}'.format(self._channel, value))
             
+            time.sleep(0.05) # wait 50 ms for next check
             # wait for instrument to arrive at destination voltage
             status = self._TB.ask_for_values('i{};volt:status?'.format(self._channel))[0]
             while status != 1.0:        # TODO: timeout check here

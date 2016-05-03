@@ -20,7 +20,7 @@ class CreateFolderTask(SimpleTask):
 
     folder_name = Unicode().tag(pref=True)
 
-    def perform(self):
+    def check(self, *args, **kwargs):
         """ Create Folder.
 
         """
@@ -28,6 +28,10 @@ class CreateFolderTask(SimpleTask):
         if not os.path.exists(folder):
             os.makedirs(folder)
 
+        return True, {}
+    
+    def perform(self):
+        pass
 
 
 KNOWN_PY_TASKS = [CreateFolderTask]

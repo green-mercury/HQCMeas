@@ -227,6 +227,7 @@ class BiltVSource(TinyBiltChannel):     # Bilt voltage source
         """
         with self.secure():
             # check if correct voltage is already set
+            value = round(value,5)          # in order to avoid bad things happening when we define linspaces like (0,1,4): basically instrument does not seem to like too many figures
             result = round(self._TB.ask_for_values('i{};Volt?'.format(self._channel))[0], 5)
             if abs(result-value) < 1e-12:
                 return
@@ -246,7 +247,7 @@ class BiltVSource(TinyBiltChannel):     # Bilt voltage source
             if abs(result-value) > 1e-12:
                 raise InstrIOError(cleandoc('''Instrument did not set
                                             correctly the output
-                                            value'''))
+                                            value {}'''.format(value)))
 
     @secure_communication()
     def smooth_change(self, volt_destination, volt_step, time_step):
